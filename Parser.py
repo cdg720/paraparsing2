@@ -60,8 +60,9 @@ class Parser:
 		return prob
 
 	def parse(self, tree1s, tree1_probs, tree2s):
-		tree1s = tree1s[:5]
-		tree2s = tree2s[:5]
+		# hack
+		tree1s = tree1s[:2]
+		#tree2s = tree2s[:5]
 		max_val = -999999 # -inf
 		for tree1, tree1_prob in zip(tree1s, tree1_probs):
 			for tree2 in tree2s:

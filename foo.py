@@ -1,6 +1,7 @@
 from CoNLL import Corpus
 from EM import EM
 from Parser import Parser
+from Words import Words
 import gzip, math, sys
 
 def normalize(probs):
@@ -57,13 +58,21 @@ def main():
 	if len(sys.argv) != 6:
 		print 'usage: python foo.py train.gold train.sd205 train.probs test.sd205 test.probs'
 		sys.exit(0)
-	#sys.argv = ['foo.py' 'data/train.gold' 'data/train.sd205.gz' 'data/train.probs.gz' 'data/test.sd205.gz' 'data/test.probs.gz']
 
 	train_trees, train_probs = read_nbest(sys.argv[2], sys.argv[3]) 
 	train_paras = train_trees[1::2] # n-best
 	gold_sents = Corpus(sys.argv[1]).sentences[::2] # gold	
 
-	em = EM(gold_sents, train_paras)
+	# print >> sys.stderr, 'start EM' 
+	#em = EM(gold_sents[:10], train_paras[:10], train_probs[1::2][:10])
+
+	targets = Words()
+	targets.preprocess(gold_sents, with_null=True)
+	paraphrases = Words()
+	paraphrases.preprocess([x[0] for x in train_paras])
+
+	em = EM(targets.sents, paraphrases.sents)
+	em.run()
 	#em.sanity()
 
 	# cheating	
@@ -76,7 +85,7 @@ def main():
 	test_trees, test_probs = read_nbest(sys.argv[4], sys.argv[5])
 
 	print >> sys.stderr, 'start parsing'
-	parser = Parser(em.probs, em.word_to_int1, em.word_to_int2, em.int_to_word1, em.int_to_word2)
+	parser = Parser(em.probs, targets.word_to_int, paraphrases.word_to_int, targets.int_to_word, paraphrases.int_to_word)
 	for tree1s, tree1_probs, tree2s in zip(test_trees[::2], test_probs[::2], test_trees[1::2]):
 		print parser.parse(tree1s, tree1_probs, tree2s)
 		print tree2s[0]
