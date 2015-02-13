@@ -67,9 +67,9 @@ def main():
 	#em = EM(gold_sents[:10], train_paras[:10], train_probs[1::2][:10])
 
 	targets = Words()
-	targets.preprocess(gold_sents, with_null=True)
+	targets.preprocess2(gold_sents, with_null=True)
 	paraphrases = Words()
-	paraphrases.preprocess([x[0] for x in train_paras])
+	paraphrases.preprocess2([x[0] for x in train_paras])
 
 	em = EM(targets.sents, paraphrases.sents)
 	em.run()
@@ -85,9 +85,10 @@ def main():
 	test_trees, test_probs = read_nbest(sys.argv[4], sys.argv[5])
 
 	print >> sys.stderr, 'start parsing'
-	parser = Parser(em.probs, targets.word_to_int, paraphrases.word_to_int, targets.int_to_word, paraphrases.int_to_word)
+	parser = Parser(em.probs, targets.word_to_int[targets.unk], paraphrases.word_to_int[paraphrases.unk])
 	for tree1s, tree1_probs, tree2s in zip(test_trees[::2], test_probs[::2], test_trees[1::2]):
-		print parser.parse(tree1s, tree1_probs, tree2s)
+		index = parser.parse([targets.convert2(x, with_null=True) for x in tree1s], tree1_probs, [paraphrases.convert2(x) for x in tree2s])
+		print tree1s[index]
 		print tree2s[0]
 
 main()
