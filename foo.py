@@ -18,7 +18,40 @@ def normalize(probs):
 	for prob in probs:
 		p.append( (2 ** (prob[0] - first[0]) / z1, math.exp(prob[1] - first[1]) / z2) )
 
-	return p 
+	return p
+
+# 0-index: 0 ROOT
+def read_alignments(file):
+	# 0: exact, 1: stem, 2: synonym, 3: paraphrase
+	f = open(file, 'r')
+	broken = []
+	tmp = []
+	count = 0
+	for line in f.read().splitlines():
+		if line == '':
+			broken.append(tmp)
+			tmp = []
+			continue
+		tmp.append(line)
+
+	alignments = []
+	for align in broken:
+		len1 = len(align[1].split()) + 1
+		len2 = len(align[2].split()) + 1
+		align1 = [[-1,-1]] * len1
+		align2 = [[-1,-1]] * len2
+		for line in align[4:]:
+			tokens = line.split() # every score = 1.0. seems weird and useless
+			x = [int(tmp) for tmp in tokens[1].split(':')] # x -> y			
+			y = [int(tmp) for tmp in tokens[0].split(':')] # y -> x
+			# ignore aligned phrases (more than one word)
+			if x[1] != 1 or y[1] != 1:
+				continue
+			align1[x[0]+1] = [y[0]+1, int(tokens[2])] # add one. ROOT is 0th word.
+			align2[y[0]+1] = [x[0]+1, int(tokens[2])]
+		alignments.append(align1)
+		alignments.append(align2)
+	return alignments
 
 def read_nbest(trees_file, probs_file):
 	corpus = Corpus(trees_file)
@@ -62,18 +95,35 @@ def main():
 	train_trees, train_probs = read_nbest(sys.argv[2], sys.argv[3]) 
 	train_paras = train_trees[1::2] # n-best
 	gold_sents = Corpus(sys.argv[1]).sentences[::2] # gold
-	sys.argv[4] # train.align
+	train_align = read_alignments(sys.argv[4]) # train.align
+
+	# print train_align[0]
+	# print len(train_align)
+	# sys.exit(0)
 
 	# print >> sys.stderr, 'start EM' 
 	#em = EM(gold_sents[:10], train_paras[:10], train_probs[1::2][:10])
 
+	tri = False
 	targets = Words()
-	targets.preprocess(gold_sents, with_null=True)
 	paraphrases = Words()
-	paraphrases.preprocess([x[0] for x in train_paras])
+	if tri:
+		targets.preprocess2(gold_sents, with_null=True)
+		paraphrases.preprocess2([x[0] for x in train_paras])
+		print >> sys.stderr, 'USING TRIGRAMS'
+	else:
+		targets.preprocess(gold_sents, with_null=True)		
+		paraphrases.preprocess([x[0] for x in train_paras])
+		print >> sys.stderr, 'USING BIGRAMS'		
 
-	em = EM(targets.sents, paraphrases.sents)
-	em.run()
+	alignment = False
+	if alignment:
+		print >> sys.stderr, 'WITH ALIGNMENTS'
+	else:
+		print >> sys.stderr, 'WITHOUT ALIGNMENTS'
+	em = EM(targets.sents, paraphrases.sents, train_align[::2], train_align[1::2])
+	em.run(cert=alignment)
+	#sys.exit(0)
 	#em.sanity()
 
 	# cheating	
@@ -84,12 +134,15 @@ def main():
 	# 	print tree2s[0]
 	
 	test_trees, test_probs = read_nbest(sys.argv[5], sys.argv[6])
-	sys.argv[7] # test.align
+	test_align = read_alignments(sys.argv[7]) # test.align
 
 	print >> sys.stderr, 'start parsing'
 	parser = Parser(em.probs, targets.word_to_int[targets.unk], paraphrases.word_to_int[paraphrases.unk])
-	for tree1s, tree1_probs, tree2s in zip(test_trees[::2], test_probs[::2], test_trees[1::2]):
-		index = parser.parse([targets.convert(x, with_null=True) for x in tree1s], tree1_probs, [paraphrases.convert(x) for x in tree2s])
+	for tree1s, tree1_probs, x_align, tree2s, y_align in zip(test_trees[::2], test_probs[::2], test_align[::2], test_trees[1::2], test_align[1::2]):
+		if tri:
+			index = parser.parse([targets.convert2(x, with_null=True) for x in tree1s], tree1_probs, [paraphrases.convert2(x) for x in tree2s], x_align, y_align, cert=alignment)
+		else:
+			index = parser.parse([targets.convert(x, with_null=True) for x in tree1s], tree1_probs, [paraphrases.convert(x) for x in tree2s], x_align, y_align, cert=alignment)
 		print tree1s[index]
 		print tree2s[0]
 

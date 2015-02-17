@@ -4,9 +4,11 @@ class EM:
 	probs = {}
 	counts = {}
 
-	def __init__(self, sents, paras):
+	def __init__(self, sents, paras, x_to_y, y_to_x):
 		self.sents = sents
 		self.paras = paras
+		self.x_to_y = x_to_y # x: sent, y: para
+		self.y_to_x = y_to_x
 
 	def estep(self):
 		log_likelihood = 0
@@ -21,6 +23,29 @@ class EM:
 				log_likelihood += math.log(p_k)
 				for e in sent:
 					self.counts[e][f] += self.probs[e][f] / p_k
+		return log_likelihood
+
+	# with alignments. I THINK THERE IS A BUG.
+	def estep2(self):
+		certainty = 0.9
+		log_likelihood = 0
+		for e in self.counts:
+			for f in self.counts[e]:
+				self.counts[e][f] = 0
+		for para, sent, x_to_y2 in zip(self.paras, self.sents, self.x_to_y):
+			for i, f in enumerate(para):
+				p_k = 0
+				for j, e in enumerate(sent):
+					if x_to_y2[j][0] == i+1:
+						p_k += self.probs[e][f] * certainty
+					else:
+						p_k += self.probs[e][f] * (1 - certainty)
+				log_likelihood += math.log(p_k)
+				for j, e in enumerate(sent):
+					if x_to_y2[j][0] == i+1:
+						self.counts[e][f] += self.probs[e][f] * certainty / p_k
+					else:
+						self.counts[e][f] += self.probs[e][f] * (1 - certainty) / p_k
 		return log_likelihood
 
 	def init(self):
@@ -41,14 +66,20 @@ class EM:
 				self.probs[e][f] = self.counts[e][f] / z
 
 	# IBM model 1
-	def run(self):
+	def run(self, cert=False):
 		self.init()
 		max_iter = 10000
-		prev = self.estep()
+		if cert:
+			prev = self.estep2()
+		else:
+			prev = self.estep()
 		self.mstep()
 		for i in xrange(1, max_iter):
 			print >> sys.stderr, i - 1, prev
-			log_likelihood = self.estep()
+			if cert:
+				log_likelihood = self.estep2()
+			else:
+				log_likelihood = self.estep()
 			if abs(log_likelihood - prev) / abs(prev) < 0.001:
 			#if abs(log_likelihood - prev) < 0.01:
 				break
