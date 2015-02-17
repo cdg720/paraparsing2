@@ -55,21 +55,22 @@ def read_nbest(trees_file, probs_file):
 	return trees, probs
 
 def main():
-	if len(sys.argv) != 6:
-		print 'usage: python foo.py train.gold train.sd205 train.probs test.sd205 test.probs'
+	if len(sys.argv) != 8:
+		print 'usage: python foo.py train.gold train.sd205 train.probs train.align test.sd205 test.probs test.align'
 		sys.exit(0)
 
 	train_trees, train_probs = read_nbest(sys.argv[2], sys.argv[3]) 
 	train_paras = train_trees[1::2] # n-best
-	gold_sents = Corpus(sys.argv[1]).sentences[::2] # gold	
+	gold_sents = Corpus(sys.argv[1]).sentences[::2] # gold
+	sys.argv[4] # train.align
 
 	# print >> sys.stderr, 'start EM' 
 	#em = EM(gold_sents[:10], train_paras[:10], train_probs[1::2][:10])
 
 	targets = Words()
-	targets.preprocess2(gold_sents, with_null=True)
+	targets.preprocess(gold_sents, with_null=True)
 	paraphrases = Words()
-	paraphrases.preprocess2([x[0] for x in train_paras])
+	paraphrases.preprocess([x[0] for x in train_paras])
 
 	em = EM(targets.sents, paraphrases.sents)
 	em.run()
@@ -82,12 +83,13 @@ def main():
 	# 	print parser.parse(tree1s, tree1_probs, tree2s)
 	# 	print tree2s[0]
 	
-	test_trees, test_probs = read_nbest(sys.argv[4], sys.argv[5])
+	test_trees, test_probs = read_nbest(sys.argv[5], sys.argv[6])
+	sys.argv[7] # test.align
 
 	print >> sys.stderr, 'start parsing'
 	parser = Parser(em.probs, targets.word_to_int[targets.unk], paraphrases.word_to_int[paraphrases.unk])
 	for tree1s, tree1_probs, tree2s in zip(test_trees[::2], test_probs[::2], test_trees[1::2]):
-		index = parser.parse([targets.convert2(x, with_null=True) for x in tree1s], tree1_probs, [paraphrases.convert2(x) for x in tree2s])
+		index = parser.parse([targets.convert(x, with_null=True) for x in tree1s], tree1_probs, [paraphrases.convert(x) for x in tree2s])
 		print tree1s[index]
 		print tree2s[0]
 
