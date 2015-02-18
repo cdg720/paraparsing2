@@ -1,4 +1,5 @@
 from CoNLL import Corpus
+from Analyzer import Analyzer
 from EM import EM
 from Parser import Parser
 from Words import Words
@@ -116,13 +117,14 @@ def main():
 		paraphrases.preprocess([x[0] for x in train_paras])
 		print >> sys.stderr, 'USING BIGRAMS'		
 
-	alignment = False
+	alignment = True
 	if alignment:
 		print >> sys.stderr, 'WITH ALIGNMENTS'
 	else:
 		print >> sys.stderr, 'WITHOUT ALIGNMENTS'
 	em = EM(targets.sents, paraphrases.sents, train_align[::2], train_align[1::2])
 	em.run(cert=alignment)
+	print >> sys.stderr, em.probs2
 	#sys.exit(0)
 	#em.sanity()
 
@@ -137,14 +139,18 @@ def main():
 	test_align = read_alignments(sys.argv[7]) # test.align
 
 	print >> sys.stderr, 'start parsing'
-	parser = Parser(em.probs, targets.word_to_int[targets.unk], paraphrases.word_to_int[paraphrases.unk])
+	parser = Parser(em.probs, em.probs2, targets.word_to_int[targets.unk], paraphrases.word_to_int[paraphrases.unk])
+	analyzer = Analyzer()
 	for tree1s, tree1_probs, x_align, tree2s, y_align in zip(test_trees[::2], test_probs[::2], test_align[::2], test_trees[1::2], test_align[1::2]):
 		if tri:
 			index = parser.parse([targets.convert2(x, with_null=True) for x in tree1s], tree1_probs, [paraphrases.convert2(x) for x in tree2s], x_align, y_align, cert=alignment)
 		else:
 			index = parser.parse([targets.convert(x, with_null=True) for x in tree1s], tree1_probs, [paraphrases.convert(x) for x in tree2s], x_align, y_align, cert=alignment)
-		print tree1s[index]
-		print tree2s[0]
+		#print index, len(tree1s), len(tree2s)
+		# analyzer.analyze(targets.convert(tree1s[index[0]], with_null=True, inting=False), paraphrases.convert(tree2s[index[1]], with_null=False, inting=False))
+		print tree1s[index[0]]
+		print tree2s[index[1]]
+	# analyzer.top_transformations()
 
 main()
 		

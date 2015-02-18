@@ -2,7 +2,9 @@ import math, operator, random, sys
 
 class EM:
 	probs = {}
+	probs2 = [0.8, 0.2]
 	counts = {}
+	counts2 = [0., 0.]
 
 	def __init__(self, sents, paras, x_to_y, y_to_x):
 		self.sents = sents
@@ -27,25 +29,27 @@ class EM:
 
 	# with alignments. I THINK THERE IS A BUG.
 	def estep2(self):
-		certainty = 0.9
 		log_likelihood = 0
 		for e in self.counts:
 			for f in self.counts[e]:
 				self.counts[e][f] = 0
+		self.counts2 = [0., 0.]
 		for para, sent, x_to_y2 in zip(self.paras, self.sents, self.x_to_y):
 			for i, f in enumerate(para):
 				p_k = 0
 				for j, e in enumerate(sent):
-					if x_to_y2[j][0] == i+1:
-						p_k += self.probs[e][f] * certainty
+					if x_to_y2[j][0] == i+1: # correct?
+						p_k += self.probs[e][f] * self.probs2[0]
 					else:
-						p_k += self.probs[e][f] * (1 - certainty)
+						p_k += self.probs[e][f] * self.probs2[1]
 				log_likelihood += math.log(p_k)
 				for j, e in enumerate(sent):
 					if x_to_y2[j][0] == i+1:
-						self.counts[e][f] += self.probs[e][f] * certainty / p_k
+						self.counts[e][f] += self.probs[e][f] * self.probs2[0] / p_k
+						self.counts2[0] += self.probs[e][f] * self.probs2[0] / p_k
 					else:
-						self.counts[e][f] += self.probs[e][f] * (1 - certainty) / p_k
+						self.counts[e][f] += self.probs[e][f] * self.probs2[1] / p_k
+						self.counts2[1] += self.probs[e][f] * self.probs2[1] / p_k
 		return log_likelihood
 
 	def init(self):
@@ -64,6 +68,10 @@ class EM:
 			z = sum(self.counts[e].values())
 			for f in self.counts[e]:
 				self.probs[e][f] = self.counts[e][f] / z
+
+		# z = sum(self.counts2)
+		# self.probs2[0] = self.counts2[0] / z
+		# self.probs2[1] = self.counts2[1] / z
 
 	# IBM model 1
 	def run(self, cert=False):

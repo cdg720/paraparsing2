@@ -10,10 +10,13 @@ class Words:
 		self.int_to_word = []
 		self.sents = []
 
-	def convert(self, tree, with_null=False):
+	def convert(self, tree, with_null=False, inting=True):
 		sent = []
 		if with_null:
-			sent.append(self.word_to_int[self.null])
+			if inting:
+				sent.append(self.word_to_int[self.null])
+			else:
+				sent.append(self.null)				
 		for token in tree.tokens[1:]:
 			word = tree.tokens[token.head].pos + ' -> ' + token.pos
 			if word not in self.word_to_int:
@@ -21,7 +24,10 @@ class Words:
 					word = self.unk
 				else:
 					word = token.pos
-			sent.append(self.word_to_int[word])
+			if inting: # map word to an int
+				sent.append(self.word_to_int[word])
+			else:
+				sent.append(word)
 		return sent
 
 	# trigram word

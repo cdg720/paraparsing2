@@ -1,8 +1,9 @@
 import math, sys
 
 class Parser:
-	def __init__(self, probs, unk1, unk2):
+	def __init__(self, probs, probs2, unk1, unk2):
 		self.probs = probs
+		self.probs2 = probs2
 		self.unk1 = unk1
 		self.unk2 = unk2
 		self.weight = 10
@@ -45,7 +46,7 @@ class Parser:
 		# print tree1, len(tree1)
 		# print tree2, len(tree2)
 		# print x_to_y, len(x_to_y)
-		certainty = 0.9
+		certainty = 0.5
 		log_prob = 0
 		for i, f in enumerate(para):
 			x = 0
@@ -53,35 +54,35 @@ class Parser:
 				if e in self.probs:
 					if f in self.probs[e]:
 						if x_to_y[j][0] == i+1:
-							x += self.probs[e][f] * certainty
+							x += self.probs[e][f] * self.probs2[0]
 						else:
-							x += self.probs[e][f] * (1 - certainty)
+							x += self.probs[e][f] * self.probs2[1]
 					elif self.unk2 in self.probs[e]:
 						if x_to_y[j][0] == i+1:
-							x += self.probs[e][self.unk2] * certainty
+							x += self.probs[e][self.unk2] * self.probs2[0]
 						else:
-							x += self.probs[e][self.unk2] * (1 - certainty)
-					else:
+							x += self.probs[e][self.unk2] * self.probs2[1]
+					else: # hack
 						if x_to_y[j][0] == i+1:
-							x += 10 ** -12 * certainty
+							x += 10 ** -12 * self.probs2[0]
 						else:
-							x += 10 ** -12 * (1 - certainty)# hack
+							x += 10 ** -12 * self.probs2[1]
 				else:
 					if f in self.probs[self.unk1]:
 						if x_to_y[j][0] == i+1:
-							x += self.probs[self.unk1][f] * certainty
+							x += self.probs[self.unk1][f] * self.probs2[0]
 						else:
-							x += self.probs[self.unk1][f] * (1 - certainty)
+							x += self.probs[self.unk1][f] * self.probs2[1]
 					elif self.unk2 in self.probs[self.unk1]:
 						if x_to_y[j][0] == i+1:
-							x += self.probs[self.unk1][self.unk2] * certainty
+							x += self.probs[self.unk1][self.unk2] * self.probs2[0]
 						else:
-							x += self.probs[self.unk1][self.unk2] * (1 - certainty)
-					else:
+							x += self.probs[self.unk1][self.unk2] * self.probs2[1]
+					else: #hack
 						if x_to_y[j][0] == i+1:
-							x += 10 ** -12 * certainty
+							x += 10 ** -12 * self.probs2[0]
 						else:
-							x += 10 ** -12 * (1 - certainty)
+							x += 10 ** -12 * self.probs2[1]
 			log_prob += math.log(x) # looks problematic
 		return log_prob
 
@@ -106,16 +107,23 @@ class Parser:
 		for tree1, tree1_prob in zip(tree1s, tree1_probs):
 			x = math.log(tree1_prob[1]) * self.weight # reranker prob
 			y = 0
+			max_val3 = -999999 # -inf hack
+			argmax2 = len(tree2s) 
+			index2 = 0
 			for tree2 in tree2s:
 				if cert:
 					z = self.conditional_prob2(tree1, tree2, x_to_y)
 				else:
 					z = self.conditional_prob(tree1, tree2)
+				if z > max_val3:
+					max_val3 = z
+					argmax2 = index2
 				y += math.exp(z-max_val)
+				index2 += 1
 			x += math.log(y)
 			if x > max_val2:
 				max_val2 = x
-				argmax = index
+				argmax = (index, argmax2)
 			index += 1
 
 		return argmax
